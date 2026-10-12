@@ -100,9 +100,6 @@ services:
       POSTGRES_USER: sonarqube
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: sonarqube
-      SONAR_WEB_CONTEXT: /sonarqube
-    expose:
-      - "9000"
     volumes:
       - sonarqube_postgres_data:/var/lib/postgresql
     healthcheck:
@@ -128,6 +125,8 @@ services:
       SONAR_WEB_JAVAADDITIONALOPTS: "-Djava.net.preferIPv6Addresses=true"
       SONAR_AUTH_JWTBASE64HS256SECRET: ${SONAR_AUTH_JWT:?SONAR_AUTH_JWT is required}
       SONAR_WEB_CONTEXT: /sonarqube
+    ports:
+      - "127.0.0.1:9000:9000"
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
