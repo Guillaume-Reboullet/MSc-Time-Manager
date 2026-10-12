@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev, feature/**]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  api:
+    if: github.repository != 'Guillaume-Reboullet/MSc-Time-Manager'
+    name: API tests and coverage
+    runs-on: self-hosted
+
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install API dependencies
+        run: npm ci
+
+      - name: Run API unit tests with coverage
+        run: npm run test:cov
+
+      - name: Run API e2e tests with coverage
+        run: npm run test:e2e:cov

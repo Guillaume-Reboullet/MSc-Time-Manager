@@ -1,0 +1,88 @@
+name: Security Gate
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  build:
+    if: github.repository == 'Guillaume-Reboullet/MSc-Time-Manager'
+    runs-on: ubuntu-latest
+    name: Build and analyze
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+      - name: Create temporary Compose environment
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SONAR_AUTH_JWT: ${{ secrets.SONAR_AUTH_JWT }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          : "${POSTGRES_USER:?POSTGRES_USER secret is required}"
+          : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD secret is required}"
+          : "${POSTGRES_DB:?POSTGRES_DB secret is required}"
+          : "${SONAR_AUTH_JWT:?SONAR_AUTH_JWT secret is required}"
+
+          {
+            printf 'POSTGRES_USER=%s\n' "$POSTGRES_USER"
+            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'POSTGRES_DB=%s\n' "$POSTGRES_DB"
+            printf 'SONAR_AUTH_JWT=%s\n' "$SONAR_AUTH_JWT"
+          } > .env.development
+      - name: Start SonarQube and PostgreSQL
+        run: |
+          docker compose \
+            -f compose.dev.yml \
+            --env-file .env.development \
+            up --build -d sonarqube sonarqube-db
+      - name: Wait for SonarQube
+        run: |
+          for attempt in $(seq 1 60); do
+            status="$(curl -fsS http://127.0.0.1:9000/sonarqube/api/system/status 2>/dev/null || true)"
+            if printf '%s' "$status" | grep -q '"status":"UP"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          docker compose \
+            -f compose.dev.yml \
+            --env-file .env.development \
+            logs --tail=100 sonarqube
+          exit 1
+      - name: Create temporary SonarQube token
+        run: |
+          token="$(
+            curl --fail --silent --show-error \
+              --user admin:admin \
+              --request POST \
+              --data-urlencode "name=github-actions-${GITHUB_RUN_ID}" \
+              http://127.0.0.1:9000/sonarqube/api/user_tokens/generate |
+              python3 -c 'import json, sys; print(json.load(sys.stdin)["token"])'
+          )"
+          echo "::add-mask::$token"
+          echo "SONAR_TOKEN=$token" >> "$GITHUB_ENV"
+      - uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+        env:
+          SONAR_HOST_URL: http://127.0.0.1:9000/sonarqube
+      # If you wish to fail your job when the Quality Gate is red, uncomment the
+      # following lines. This would typically be used to fail a deployment.
+      - uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
+        timeout-minutes: 5
+        env:
+          SONAR_HOST_URL: http://127.0.0.1:9000/sonarqube
+      - name: Stop SonarQube and PostgreSQL
+        if: ${{ always() }}
+        run: |
+          docker compose \
+            -f compose.dev.yml \
+            --env-file .env.development \
+            down -v
+          rm -f .env.development

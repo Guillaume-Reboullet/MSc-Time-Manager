@@ -1,0 +1,16 @@
+echo "[pre-commit] Running API unit tests..."
+pnpm test:api
+echo "[pre-commit] Running API e2e tests..."
+pnpm test:e2e
+echo "[pre-commit] Checking TypeScript types..."
+pnpm typecheck:api
+echo "[pre-commit] Formatting staged files..."
+staged_files=$(git diff --cached --name-only --diff-filter=ACMR | sed 's| |\\ |g')
+if [ -n "$staged_files" ]; then
+	prettier $staged_files --write --ignore-unknown
+else
+	echo "[pre-commit] No supported staged files to format."
+fi
+echo "[pre-commit] Updating the Git index..."
+git update-index --again
+echo "[pre-commit] Pre-commit checks completed."
