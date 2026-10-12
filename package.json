@@ -1,0 +1,14 @@
+{
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "test:api": "pnpm --dir api run test",
+    "test:e2e": "pnpm --dir api run test:e2e",
+    "typecheck:api": "pnpm --dir api run typecheck"
+  },
+  "dependencies": {
+    "prettier": "^3.9.9"
+  }
+}
