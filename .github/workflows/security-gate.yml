@@ -9,13 +9,18 @@ on:
 jobs:
   build:
     if: github.repository == 'Guillaume-Reboullet/MSc-Time-Manager'
-    name: Build and analyze
     runs-on: ubuntu-latest
-
+    name: Build and analyze
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+      - name: Start SonarQube and PostgreSQL
+        run: |
+          docker compose \
+            -f compose.dev.yml \
+            --env-file .env.development \
+            up --build -d sonarqube sonarqube-db
       - uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
