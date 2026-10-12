@@ -8,6 +8,7 @@ on:
 
 jobs:
   api:
+    if: github.repository != 'Guillaume-Reboullet/MSc-Time-Manager'
     name: API tests and coverage
     runs-on: self-hosted
 

@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   sync:
+    if: github.repository != 'Guillaume-Reboullet/MSc-Time-Manager'
     runs-on: self-hosted
 
     steps:
