@@ -78,9 +78,65 @@ jobs:
     steps:
       - name: SSH and pull Docker image
         uses: appleboy/ssh-action@v0.1.7
+        env:
+          GHCR_USERNAME: ${{ github.repository_owner }}
+          GHCR_TOKEN: ${{ secrets.GH_PAT }}
+          DEPLOY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: GHCR_USERNAME,GHCR_TOKEN,DEPLOY_IMAGE
           script: |
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            set -eu
+            : "${GHCR_USERNAME:?GHCR_USERNAME is required}"
+            : "${GHCR_TOKEN:?GHCR_TOKEN is required}"
+            : "${DEPLOY_IMAGE:?DEPLOY_IMAGE is required}"
+
+            printf '%s' "$GHCR_TOKEN" |
+              docker login ghcr.io \
+                --username "$GHCR_USERNAME" \
+                --password-stdin
+            docker pull "$DEPLOY_IMAGE"
+            docker logout ghcr.io
+
+  build-image-on-server:
+    if: >-
+      success() &&
+      github.repository == 'Guillaume-Reboullet/MSc-Time-Manager' &&
+      github.event.client_payload.source_repository ==
+      'EpitechMscProPromo2028/T-DEV-700-PAR-7-1-time_manager-40' &&
+      github.event.client_payload.branch == 'main'
+    needs: ssh-and-pull-image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build API image on deployment server
+        uses: appleboy/ssh-action@v0.1.7
+        env:
+          DEPLOY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DEPLOY_IMAGE
+          script: |
+            set -eu
+            : "${DEPLOY_IMAGE:?DEPLOY_IMAGE is required}"
+            docker stop time-manager-api || true
+            docker rm time-manager-api || true
+            docker run -d \
+              --name time-manager-api \
+              --restart unless-stopped \
+              -p 4003:3000 \
+              "$DEPLOY_IMAGE"
+
+            sleep 3
+            CONTAINER_STATUS="$(docker inspect -f '{{.State.Status}}' time-manager-api 2>/dev/null || true)"
+
+            if [ "$CONTAINER_STATUS" != "running" ]; then
+              echo "time-manager-api is not running (status: ${CONTAINER_STATUS:-unknown})"
+              docker logs time-manager-api || true
+              exit 1
+            fi
+
+            echo "time-manager-api is running"
