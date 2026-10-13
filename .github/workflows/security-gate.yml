@@ -4,12 +4,19 @@ on:
   repository_dispatch:
     types: [sync-complete]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     if: >-
       github.repository == 'Guillaume-Reboullet/MSc-Time-Manager' &&
       github.event.client_payload.source_repository ==
-      'EpitechMscProPromo2028/T-DEV-700-PAR-7-1-time_manager-40'
+      'EpitechMscProPromo2028/T-DEV-700-PAR-7-1-time_manager-40' &&
+      (
+        github.event.client_payload.branch == 'main' ||
+        github.event.client_payload.branch == 'dev'
+      )
     name: Build and analyze
     runs-on: ubuntu-latest
     steps:
@@ -21,9 +28,38 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
       # If you wish to fail your job when the Quality Gate is red, uncomment the
       # following lines. This would typically be used to fail a deployment.
       - uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Trigger deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ github.event.client_payload.branch }}
+          SOURCE_SHA: ${{ github.event.client_payload.source_sha }}
+          SOURCE_REPOSITORY: ${{ github.event.client_payload.source_repository }}
+        run: |
+          jq -n \
+            --arg branch "$TARGET_BRANCH" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg source_repository "$SOURCE_REPOSITORY" \
+            '{
+              event_type: "security-passed",
+              client_payload: {
+                branch: $branch,
+                source_sha: $source_sha,
+                source_repository: $source_repository
+              }
+            }' |
+            curl --fail --silent --show-error \
+              --request POST \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --header "Content-Type: application/json" \
+              --data-binary @- \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/dispatches"
