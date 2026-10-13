@@ -127,7 +127,7 @@ jobs:
             docker run -d \
               --name time-manager-api \
               --restart unless-stopped \
-              -p 4003:3000 \
+              -p 4007:3000 \
               "$DEPLOY_IMAGE"
 
             sleep 3
