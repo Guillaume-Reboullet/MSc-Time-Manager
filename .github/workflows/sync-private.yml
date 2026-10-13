@@ -81,6 +81,11 @@ jobs:
           TARGET_BRANCH: ${{ github.event.workflow_run.head_branch }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "GH_PAT is not configured"
+            exit 1
+          fi
+
           jq -n \
             --arg branch "$TARGET_BRANCH" \
             --arg source_sha "$SOURCE_SHA" \
@@ -93,7 +98,11 @@ jobs:
                 source_repository: $source_repository
               }
             }' |
-            gh api \
-              --method POST \
-              --input - \
-              "/repos/Guillaume-Reboullet/MSc-Time-Manager/dispatches"
+            curl --fail --silent --show-error \
+              --request POST \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --header "Content-Type: application/json" \
+              --data-binary @- \
+              "https://api.github.com/repos/Guillaume-Reboullet/MSc-Time-Manager/dispatches"
