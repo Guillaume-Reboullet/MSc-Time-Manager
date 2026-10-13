@@ -1,4 +1,4 @@
-name: API - Create and publish a Docker image
+name: API - Deployment
 
 on:
   workflow_run:
@@ -58,3 +58,14 @@ jobs:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+  ssh-and-pull-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and pull Docker image
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
