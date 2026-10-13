@@ -1,11 +1,9 @@
 name: Sync Private Repository
 
 on:
-  push:
-    branches:
-      - main
-      - dev
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["CI - Tests"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -16,13 +14,20 @@ concurrency:
 
 jobs:
   sync:
-    if: github.repository != 'Guillaume-Reboullet/MSc-Time-Manager'
+    if: >-
+      github.repository != 'Guillaume-Reboullet/MSc-Time-Manager' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      (
+        github.event.workflow_run.head_branch == 'main' ||
+        github.event.workflow_run.head_branch == 'dev'
+      )
     runs-on: self-hosted
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           path: source
           persist-credentials: false
 
@@ -30,7 +35,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: Guillaume-Reboullet/MSc-Time-Manager
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.workflow_run.head_branch }}
           token: ${{ secrets.GH_PAT }}
           path: destination
 
@@ -68,4 +73,27 @@ jobs:
           fi
 
           git commit -m "Sync from $GITHUB_REPOSITORY"
-          git push origin HEAD:${GITHUB_REF#refs/heads/}
+          git push origin "HEAD:refs/heads/${{ github.event.workflow_run.head_branch }}"
+
+      - name: Trigger security gate
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          TARGET_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          jq -n \
+            --arg branch "$TARGET_BRANCH" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg source_repository "$GITHUB_REPOSITORY" \
+            '{
+              event_type: "sync-complete",
+              client_payload: {
+                branch: $branch,
+                source_sha: $source_sha,
+                source_repository: $source_repository
+              }
+            }' |
+            gh api \
+              --method POST \
+              --input - \
+              "/repos/Guillaume-Reboullet/MSc-Time-Manager/dispatches"
