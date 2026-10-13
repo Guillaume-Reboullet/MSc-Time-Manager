@@ -1,5 +1,7 @@
 # Time Manager
 
+[![Quality gate status](https://sonarqube.guillaume-reboullet.com/sonarqube/api/project_badges/measure?project=Guillaume-Reboullet_MSc-Time-Manager_4e3ef3a7-7bbc-4f91-86df-7a4d0a1fcf68&metric=alert_status&token=sqb_15f1d769adbcdd540ae1946d95fa5cf0854ae2a9)](https://sonarqube.guillaume-reboullet.com/sonarqube/dashboard?id=Guillaume-Reboullet_MSc-Time-Manager_4e3ef3a7-7bbc-4f91-86df-7a4d0a1fcf68)
+
 > Outil interne de gestion du temps
 
 L’objectif principal de Time Manager est de centraliser la gestion du temps et des
